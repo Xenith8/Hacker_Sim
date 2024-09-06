@@ -1,0 +1,1025 @@
+<html><head><base href="https://hacker-sim.example.com/"><title>Hacker Sim - Course aux 100 Niveaux</title>
+<style>
+  body {
+    font-family: 'Courier New', monospace;
+    background-color: #0a0a0a;
+    color: #00ff00;
+    margin: 0;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+  }
+  #terminal {
+    background-color: #000;
+    border: 1px solid #00ff00;
+    padding: 10px;
+    overflow-y: auto;
+    flex-grow: 1;
+    height: 60vh;
+    font-size: 16px;
+  }
+  #input {
+    background-color: #000;
+    border: 1px solid #00ff00;
+    color: #00ff00;
+    padding: 10px;
+    width: 100%;
+    margin-top: 10px;
+    font-size: 16px;
+  }
+  .success { color: #00ff00; }
+  .error { color: #ff0000; }
+  .info { color: #0000ff; }
+  .warning { color: #ffff00; }
+  #statusBar {
+    background-color: #333;
+    color: #fff;
+    padding: 10px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 18px;
+  }
+  #progressBar {
+    width: 100%;
+    background-color: #ddd;
+    margin-top: 10px;
+  }
+  #progressBar .bar {
+    height: 30px;
+    background-color: #00ff00;
+    width: 0%;
+    transition: width 0.5s ease-in-out;
+  }
+  #inventory, #objectives, #networkMap {
+    background-color: #1a1a1a;
+    border: 1px solid #00ff00;
+    padding: 15px;
+    margin-top: 15px;
+    font-size: 14px;
+  }
+  .inventory-item, .objective {
+    margin-bottom: 10px;
+  }
+  .completed {
+    text-decoration: line-through;
+    color: #888;
+  }
+  #languageSelector, #difficultySelector {
+    margin-bottom: 15px;
+  }
+  #languageSelector select, #difficultySelector select {
+    font-size: 16px;
+    padding: 5px;
+  }
+  .game-container {
+    display: flex;
+    justify-content: space-between;
+  }
+  .main-area {
+    flex: 2;
+    margin-right: 20px;
+  }
+  .side-panel {
+    flex: 1;
+  }
+  #networkSVG {
+    width: 100%;
+    height: 300px;
+    background-color: #0f0f0f;
+    border: 1px solid #00ff00;
+  }
+  .node {
+    fill: #00ff00;
+  }
+  .link {
+    stroke: #00ff00;
+    stroke-width: 2px;
+  }
+  .node-label {
+    font-size: 12px;
+    fill: #00ff00;
+  }
+  .inventory-item {
+    cursor: pointer;
+    padding: 5px;
+    border: 1px solid #00ff00;
+    margin-bottom: 5px;
+    transition: background-color 0.3s;
+  }
+  .inventory-item:hover {
+    background-color: #003300;
+  }
+  .inventory-item.active {
+    background-color: #006600;
+  }
+  #congratulationsScreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.9);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    z-index: 1000;
+  }
+  #congratulationsMessage {
+    font-size: 48px;
+    color: #00ff00;
+    text-align: center;
+    margin-bottom: 20px;
+  }
+  #matrixRain {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+  }
+</style>
+</head>
+<body>
+<div id="languageSelector">
+  <select id="language" onchange="changeLanguage()">
+    <option value="fr">Français</option>
+    <option value="en">English</option>
+    <option value="es">Español</option>
+    <option value="de">Deutsch</option>
+    <option value="it">Italiano</option>
+  </select>
+</div>
+<div id="difficultySelector">
+  <select id="difficulty" onchange="changeDifficulty()">
+    <option value="easy">Facile</option>
+    <option value="medium">Moyen</option>
+    <option value="hard">Difficile</option>
+    <option value="extreme">Extrême</option>
+  </select>
+</div>
+<div id="statusBar">
+  <span id="accessLevel">Niveau d'accès: 0</span>
+  <span id="timer">30:00</span>
+</div>
+<div id="progressBar">
+  <div class="bar"></div>
+</div>
+<div class="game-container">
+  <div class="main-area">
+    <div id="terminal"></div>
+    <input type="text" id="input" placeholder="Entrez votre commande ici">
+  </div>
+  <div class="side-panel">
+    <div id="inventory">
+      <h3>Inventaire</h3>
+      <div id="inventoryItems"></div>
+    </div>
+    <div id="objectives">
+      <h3>Objectifs</h3>
+      <div id="objectivesList"></div>
+    </div>
+    <div id="networkMap">
+      <h3>Carte du réseau</h3>
+      <svg id="networkSVG"></svg>
+    </div>
+  </div>
+</div>
+
+<div id="congratulationsScreen">
+  <div id="congratulationsMessage"></div>
+  <canvas id="matrixRain"></canvas>
+</div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+let systemState = {
+  vulnerabilities: [],
+  backdoorInstalled: false,
+  dataEncrypted: false,
+  encryptedData: null,
+  accessLevel: 0,
+  firewallActive: true,
+  antivirusActive: true,
+  networkConnections: [],
+  logs: [],
+  processes: [],
+  users: [
+    { username: 'admin', password: 'admin123', level: 5 },
+    { username: 'user', password: 'password', level: 1 }
+  ],
+  currentUser: null,
+  files: {
+    '/': ['home', 'etc', 'var'],
+    '/home': ['user'],
+    '/home/user': ['documents', 'downloads'],
+    '/etc': ['passwd', 'shadow'],
+    '/var': ['log']
+  },
+  currentDirectory: '/',
+  malware: [],
+  honeyPots: [],
+  ipsRules: [],
+  vpnActive: false,
+  inventory: [
+    { name: 'USB Keylogger', description: 'Enregistre toutes les frappes clavier sur un système cible.', effect: 'Augmente les chances de récupérer des mots de passe.' },
+    { name: 'Cryptographic Token', description: 'Dispositif de sécurité pour l\'authentification à deux facteurs.', effect: 'Permet de contourner certaines mesures de sécurité.' },
+    { name: 'Network Sniffer', description: 'Outil pour capturer et analyser le trafic réseau.', effect: 'Révèle des informations sur les connexions réseau actives.' }
+  ],
+  networkNodes: [],
+  missionObjectives: [],
+  gameStarted: false,
+  currentLanguage: 'fr',
+  activeItem: null,
+  serverAccessed: false,
+  sensitiveDataExfiltrated: false,
+  rootkitInstalled: false,
+  shellObtained: false,
+  difficulty: 'medium'
+};
+
+let gameTimer;
+let timerInterval;
+
+const translations = {
+  fr: {
+    welcomeMessage: "Bienvenue dans Hacker Sim - Course aux 100 Niveaux!",
+    startPrompt: "Tapez 'start' pour commencer le jeu.",
+    commandNotFound: "Commande non reconnue. Tapez 'help' pour voir la liste des commandes disponibles.",
+    accessLevelIncreased: "Niveau d'accès augmenté à",
+    objectiveCompleted: "Objectif complété:",
+    inventoryAdded: "Ajouté à l'inventaire:",
+    gameStarted: "Le jeu a commencé! Vous avez 30 minutes pour atteindre le niveau d'accès 100 ou compléter tous les objectifs.",
+    gameAlreadyStarted: "Le jeu a déjà commencé!",
+    gameOver: "Temps écoulé! Fin du jeu.",
+    victoryAccessLevel: "Félicitations! Vous avez atteint le niveau d'accès 100 et gagné le jeu!",
+    victoryObjectives: "Félicitations! Vous avez complété tous les objectifs et gagné le jeu!",
+    availableCommands: "Commandes disponibles:",
+    noItemsInInventory: "Aucun objet dans l'inventaire.",
+    gameRestarted: "Le jeu a été redémarré. Utilisez la commande 'start' pour commencer une nouvelle partie.",
+    currentDirectory: "Répertoire actuel:",
+    fileCreated: "Fichier créé:",
+    fileDeleted: "Fichier supprimé:",
+    directoryCreated: "Répertoire créé:",
+    directoryDeleted: "Répertoire supprimé:",
+    connectionEstablished: "Connexion établie avec",
+    connectionClosed: "Connexion fermée",
+    bruteforceStarted: "Attaque par force brute démarrée sur",
+    bruteforceSuccess: "Attaque par force brute réussie! Mot de passe trouvé:",
+    bruteForceFailed: "Attaque par force brute échouée.",
+    packetSniffingStarted: "Capture de paquets démarrée...",
+    packetSniffingStopped: "Capture de paquets arrêtée. Données capturées:",
+    itemActivated: "Objet activé:",
+    itemDeactivated: "Objet désactivé:",
+    itemUsed: "Objet utilisé:",
+    noActiveItem: "Aucun objet actif à utiliser.",
+    serverAccessedSuccess: "Accès au serveur principal réussi!",
+    firewallDisabled: "Pare-feu désactivé avec succès!",
+    sensitiveDataExfiltrated: "Données sensibles exfiltrées avec succès!",
+    rootkitInstalled: "Rootkit installé avec succès!",
+    shellObtained: "Shell obtenu sur le système cible!",
+    languageChanged: "Langue changée en Français",
+    difficultyChanged: "Difficulté changée en",
+    accessLevel: "Niveau d'accès",
+    inventory: "Inventaire",
+    objectives: "Objectifs",
+    networkMap: "Carte du réseau",
+    enterCommand: "Entrez votre commande ici",
+    objectivesGenerated: "Nouveaux objectifs générés pour cette partie!",
+    networkMapGenerated: "Nouvelle carte réseau générée pour cette partie!",
+    easy: "Facile",
+    medium: "Moyen",
+    hard: "Difficile",
+    extreme: "Extrême",
+    gameRestarted: "Le jeu a été redémarré. Utilisez la commande 'start' pour commencer une nouvelle partie.",
+    congratulations: "Félicitations, Hacker d'élite!",
+    missionAccomplished: "Mission accomplie avec brio!"
+  },
+  en: {
+    welcomeMessage: "Welcome to Hacker Sim - Race to 100 Levels!",
+    startPrompt: "Type 'start' to begin the game.",
+    commandNotFound: "Command not recognized. Type 'help' to see the list of available commands.",
+    accessLevelIncreased: "Access level increased to",
+    objectiveCompleted: "Objective completed:",
+    inventoryAdded: "Added to inventory:",
+    gameStarted: "The game has started! You have 30 minutes to reach access level 100 or complete all objectives.",
+    gameAlreadyStarted: "The game has already started!",
+    gameOver: "Time's up! Game over.",
+    victoryAccessLevel: "Congratulations! You've reached access level 100 and won the game!",
+    victoryObjectives: "Congratulations! You've completed all objectives and won the game!",
+    availableCommands: "Available commands:",
+    noItemsInInventory: "No items in inventory.",
+    gameRestarted: "The game has been restarted. Use the 'start' command to begin a new game.",
+    currentDirectory: "Current directory:",
+    fileCreated: "File created:",
+    fileDeleted: "File deleted:",
+    directoryCreated: "Directory created:",
+    directoryDeleted: "Directory deleted:",
+    connectionEstablished: "Connection established with",
+    connectionClosed: "Connection closed",
+    bruteforceStarted: "Brute force attack started on",
+    bruteforceSuccess: "Brute force attack successful! Password found:",
+    bruteForceFailed: "Brute force attack failed.",
+    packetSniffingStarted: "Packet sniffing started...",
+    packetSniffingStopped: "Packet sniffing stopped. Captured data:",
+    itemActivated: "Item activated:",
+    itemDeactivated: "Item deactivated:",
+    itemUsed: "Item used:",
+    noActiveItem: "No active item to use.",
+    serverAccessedSuccess: "Main server accessed successfully!",
+    firewallDisabled: "Firewall disabled successfully!",
+    sensitiveDataExfiltrated: "Sensitive data exfiltrated successfully!",
+    rootkitInstalled: "Rootkit installed successfully!",
+    shellObtained: "Shell obtained on target system!",
+    languageChanged: "Language changed to English",
+    difficultyChanged: "Difficulty changed to",
+    accessLevel: "Access Level",
+    inventory: "Inventory",
+    objectives: "Objectives",
+    networkMap: "Network Map",
+    enterCommand: "Enter your command here",
+    objectivesGenerated: "New objectives generated for this game!",
+    networkMapGenerated: "New network map generated for this game!",
+    easy: "Easy",
+    medium: "Medium",
+    hard: "Hard",
+    extreme: "Extreme",
+    gameRestarted: "The game has been restarted. Use the 'start' command to begin a new game.",
+    congratulations: "Congratulations, Elite Hacker!",
+    missionAccomplished: "Mission accomplished with flying colors!"
+  },
+};
+
+const terminal = document.getElementById('terminal');
+const input = document.getElementById('input');
+const statusBar = document.getElementById('statusBar');
+const progressBar = document.getElementById('progressBar').querySelector('.bar');
+
+input.addEventListener('keyup', function(event) {
+  if (event.key === 'Enter') {
+    const command = input.value.trim().toLowerCase();
+    processCommand(command);
+    input.value = '';
+  }
+});
+
+function processCommand(command) {
+  if (command in commands) {
+    const output = commands[command]();
+    updateTerminal(output);
+  } else {
+    updateTerminal(`<span class="error">${translations[systemState.currentLanguage].commandNotFound}</span>`);
+  }
+  updateStatusBar();
+  updateProgressBar();
+}
+
+function updateTerminal(message) {
+  terminal.innerHTML += `<div>${message}</div>`;
+  terminal.scrollTop = terminal.scrollHeight;
+}
+
+function updateStatusBar() {
+  statusBar.innerHTML = `<span>${translations[systemState.currentLanguage].accessLevel}: ${systemState.accessLevel}</span><span id="timer">${formatTime(gameTimer)}</span>`;
+}
+
+function updateProgressBar() {
+  const progress = (systemState.accessLevel / 100) * 100;
+  progressBar.style.width = `${progress}%`;
+}
+
+function formatTime(seconds) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+function startTimer() {
+  timerInterval = setInterval(() => {
+    gameTimer--;
+    updateStatusBar();
+    if (gameTimer <= 0) {
+      clearInterval(timerInterval);
+      endGame();
+    }
+    if (checkVictoryCondition()) {
+      clearInterval(timerInterval);
+    }
+  }, 1000);
+}
+
+function endGame() {
+  updateTerminal(`<span class="error">${translations[systemState.currentLanguage].gameOver}</span>`);
+  systemState.gameStarted = false;
+}
+
+function checkVictoryCondition() {
+  if (systemState.accessLevel >= 100 || systemState.missionObjectives.every(obj => obj.completed)) {
+    clearInterval(timerInterval);
+    showCongratulationsScreen();
+    return true;
+  }
+  return false;
+}
+
+function showCongratulationsScreen() {
+  const congratulationsScreen = document.getElementById('congratulationsScreen');
+  const congratulationsMessage = document.getElementById('congratulationsMessage');
+  
+  congratulationsMessage.innerHTML = `
+    <h1>${translations[systemState.currentLanguage].congratulations}</h1>
+    <p>${translations[systemState.currentLanguage].missionAccomplished}</p>
+  `;
+  
+  congratulationsScreen.style.display = 'flex';
+  startMatrixRain();
+}
+
+function startMatrixRain() {
+  const canvas = document.getElementById('matrixRain');
+  const ctx = canvas.getContext('2d');
+
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789@#$%^&*()_+-=[]{}|;:,.<>?';
+  const fontSize = 16;
+  const columns = canvas.width / fontSize;
+  const drops = [];
+
+  for (let i = 0; i < columns; i++) {
+    drops[i] = 1;
+  }
+
+  function draw() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = '#0F0';
+    ctx.font = fontSize + 'px monospace';
+
+    for (let i = 0; i < drops.length; i++) {
+      const text = characters.charAt(Math.floor(Math.random() * characters.length));
+      ctx.fillText(text, i * fontSize, drops[i] * fontSize);
+
+      if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+        drops[i] = 0;
+      }
+
+      drops[i]++;
+    }
+  }
+
+  setInterval(draw, 33);
+}
+
+function updateInventory() {
+  const inventoryItems = document.getElementById('inventoryItems');
+  inventoryItems.innerHTML = '';
+  if (systemState.inventory.length === 0) {
+    inventoryItems.innerHTML = `<div>${translations[systemState.currentLanguage].noItemsInInventory}</div>`;
+  } else {
+    systemState.inventory.forEach((item, index) => {
+      const itemElement = document.createElement('div');
+      itemElement.className = `inventory-item ${systemState.activeItem === index ? 'active' : ''}`;
+      itemElement.innerHTML = `
+        <strong>${item.name}</strong>: ${item.description}<br>
+        <em>${item.effect}</em>
+      `;
+      itemElement.onclick = () => toggleInventoryItem(index);
+      inventoryItems.appendChild(itemElement);
+    });
+  }
+}
+
+function toggleInventoryItem(index) {
+  if (systemState.activeItem === index) {
+    systemState.activeItem = null;
+    updateTerminal(`<span class="info">${translations[systemState.currentLanguage].itemDeactivated} ${systemState.inventory[index].name}</span>`);
+  } else {
+    systemState.activeItem = index;
+    updateTerminal(`<span class="info">${translations[systemState.currentLanguage].itemActivated} ${systemState.inventory[index].name}</span>`);
+  }
+  updateInventory();
+}
+
+function updateObjectives() {
+  const objectivesList = document.getElementById('objectivesList');
+  objectivesList.innerHTML = '';
+  systemState.missionObjectives.forEach(objective => {
+    const className = objective.completed ? 'completed' : '';
+    objectivesList.innerHTML += `
+      <div class="objective ${className}">
+        ${objective.description}
+      </div>`;
+  });
+}
+
+function updateNetworkMap() {
+  const svg = d3.select("#networkSVG");
+  svg.selectAll("*").remove();
+
+  const width = svg.node().getBoundingClientRect().width;
+  const height = svg.node().getBoundingClientRect().height;
+
+  const simulation = d3.forceSimulation(systemState.networkNodes)
+    .force("link", d3.forceLink().id(d => d.id).distance(100))
+    .force("charge", d3.forceManyBody().strength(-300))
+    .force("center", d3.forceCenter(width / 2, height / 2));
+
+  const links = [];
+  systemState.networkNodes.forEach(node => {
+    node.connections.forEach(target => {
+      links.push({source: node.id, target: target});
+    });
+  });
+
+  const link = svg.append("g")
+    .selectAll("line")
+    .data(links)
+    .enter().append("line")
+    .attr("class", "link");
+
+  const node = svg.append("g")
+    .selectAll("circle")
+    .data(systemState.networkNodes)
+    .enter().append("circle")
+    .attr("class", "node")
+    .attr("r", 10)
+    .call(d3.drag()
+      .on("start", dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended));
+
+  const label = svg.append("g")
+    .selectAll("text")
+    .data(systemState.networkNodes)
+    .enter().append("text")
+    .attr("class", "node-label")
+    .text(d => d.id)
+    .attr("x", 12)
+    .attr("y", 3);
+
+  simulation
+    .nodes(systemState.networkNodes)
+    .on("tick", ticked);
+
+  simulation.force("link")
+    .links(links);
+
+  function ticked() {
+    link
+      .attr("x1", d => d.source.x)
+      .attr("y1", d => d.source.y)
+      .attr("x2", d => d.target.x)
+      .attr("y2", d => d.target.y);
+
+    node
+      .attr("cx", d => d.x)
+      .attr("cy", d => d.y);
+
+    label
+      .attr("x", d => d.x + 12)
+      .attr("y", d => d.y + 3);
+  }
+
+  function dragstarted(event, d) {
+    if (!event.active) simulation.alphaTarget(0.3).restart();
+    d.fx = d.x;
+    d.fy = d.y;
+  }
+
+  function dragged(event, d) {
+    d.fx = event.x;
+    d.fy = event.y;
+  }
+
+  function dragended(event, d) {
+    if (!event.active) simulation.alphaTarget(0);
+    d.fx = null;
+    d.fy = null;
+  }
+}
+
+function generateObjectives() {
+  const allObjectives = [
+    { id: 'obj1', description: 'Accéder au serveur principal' },
+    { id: 'obj2', description: 'Désactiver le pare-feu' },
+    { id: 'obj3', description: 'Exfiltrer les données sensibles' },
+    { id: 'obj4', description: 'Installer un rootkit' },
+    { id: 'obj5', description: 'Obtenir un shell sur le système cible' },
+    { id: 'obj6', description: 'Intercepter les communications réseau' },
+    { id: 'obj7', description: 'Créer un compte utilisateur fantôme' },
+    { id: 'obj8', description: 'Contourner l\'authentification à deux facteurs' },
+    { id: 'obj9', description: 'Exploiter une vulnérabilité zero-day' },
+    { id: 'obj10', description: 'Effectuer une attaque par déni de service' }
+  ];
+
+  for (let i = allObjectives.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allObjectives[i], allObjectives[j]] = [allObjectives[j], allObjectives[i]];
+  }
+
+  let numObjectives;
+  switch (systemState.difficulty) {
+    case 'easy':
+      numObjectives = 3;
+      break;
+    case 'medium':
+      numObjectives = 5;
+      break;
+    case 'hard':
+      numObjectives = 7;
+      break;
+    case 'extreme':
+      numObjectives = 10;
+      break;
+    default:
+      numObjectives = 5;
+  }
+
+  systemState.missionObjectives = allObjectives.slice(0, numObjectives).map(obj => ({...obj, completed: false}));
+}
+
+function generateNetworkMap() {
+  const nodeTypes = ['server', 'router', 'switch', 'pc', 'firewall'];
+  let numNodes;
+
+  switch (systemState.difficulty) {
+    case 'easy':
+      numNodes = Math.floor(Math.random() * 3) + 3;
+      break;
+    case 'medium':
+      numNodes = Math.floor(Math.random() * 5) + 5;
+      break;
+    case 'hard':
+      numNodes = Math.floor(Math.random() * 7) + 7;
+      break;
+    case 'extreme':
+      numNodes = Math.floor(Math.random() * 9) + 9;
+      break;
+    default:
+      numNodes = Math.floor(Math.random() * 5) + 5;
+  }
+
+  systemState.networkNodes = [];
+
+  for (let i = 0; i < numNodes; i++) {
+    const type = nodeTypes[Math.floor(Math.random() * nodeTypes.length)];
+    systemState.networkNodes.push({
+      id: `${type}${i+1}`,
+      type: type,
+      connections: []
+    });
+  }
+
+  for (let i = 0; i < systemState.networkNodes.length; i++) {
+    const numConnections = Math.floor(Math.random() * 3) + 1;
+    for (let j = 0; j < numConnections; j++) {
+      let targetIndex;
+      do {
+        targetIndex = Math.floor(Math.random() * systemState.networkNodes.length);
+      } while (targetIndex === i || systemState.networkNodes[i].connections.includes(systemState.networkNodes[targetIndex].id));
+
+      systemState.networkNodes[i].connections.push(systemState.networkNodes[targetIndex].id);
+      systemState.networkNodes[targetIndex].connections.push(systemState.networkNodes[i].id);
+    }
+  }
+}
+
+const commands = {
+  'help': () => {
+    return `<span class="info">${translations[systemState.currentLanguage].availableCommands}</span><br>
+            start - ${translations[systemState.currentLanguage].startPrompt}<br>
+            scan - Analyser le réseau<br>
+            exploit - Tenter d'exploiter une vulnérabilité<br>
+            install_backdoor - Installer une porte dérobée<br>
+            encrypt - Chiffrer les données<br>
+            decrypt - Déchiffrer les données<br>
+            upgrade - Améliorer le niveau d'accès<br>
+            firewall - Gérer le pare-feu<br>
+            antivirus - Gérer l'antivirus<br>
+            connect - Se connecter à un nœud du réseau<br>
+            disconnect -  Se déconnecter du nœud actuel<br>
+            ls - Lister les fichiers du répertoire courant<br>
+            cd - Changer de répertoire<br>
+            cat - Afficher le contenu d'un fichier<br>
+            rm - Supprimer un fichier ou un répertoire<br>
+            mkdir - Créer un nouveau répertoire<br>
+            touch - Créer un nouveau fichier<br>
+            whoami - Afficher l'utilisateur actuel<br>
+            su - Changer d'utilisateur<br>
+            ps - Lister les processus en cours<br>
+            kill - Terminer un processus<br>
+            ifconfig - Afficher les informations réseau<br>
+            ping - Tester la connectivité avec un hôte<br>
+            nmap - Scanner les ports d'un hôte<br>
+            ssh - Se connecter à distance via SSH<br>
+            wget - Télécharger des fichiers<br>
+            use - Utiliser un objet de l'inventaire<br>
+            inventory - Afficher l'inventaire<br>
+            objectives - Afficher les objectifs de la mission<br>
+            restart - Redémarrer le jeu`;
+  },
+  'start': () => {
+    if (!systemState.gameStarted) {
+      systemState.gameStarted = true;
+      generateObjectives();
+      generateNetworkMap();
+      updateInventory();
+      updateObjectives();
+      updateNetworkMap();
+      switch (systemState.difficulty) {
+        case 'easy':
+          gameTimer = 1800; // 30 minutes
+          break;
+        case 'medium':
+          gameTimer = 1200; // 20 minutes
+          break;
+        case 'hard':
+          gameTimer = 600; // 10 minutes
+          break;
+        case 'extreme':
+          gameTimer = 300; // 5 minutes
+          break;
+        default:
+          gameTimer = 1800; // Default to 30 minutes
+      }
+      startTimer();
+      return `<span class="success">${translations[systemState.currentLanguage].gameStarted}</span>`;
+    } else {
+      return `<span class="warning">${translations[systemState.currentLanguage].gameAlreadyStarted}</span>`;
+    }
+  },
+  'scan': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    const vulnerabilities = ['Injection SQL', 'XSS', 'CSRF', 'Buffer Overflow', 'Remote Code Execution'];
+    const detectedVulnerability = vulnerabilities[Math.floor(Math.random() * vulnerabilities.length)];
+    systemState.vulnerabilities.push(detectedVulnerability);
+    return `<span class="info">Scan terminé. Vulnérabilité détectée : ${detectedVulnerability}</span>`;
+  },
+  'exploit': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    if (systemState.vulnerabilities.length === 0) {
+      return "<span class='error'>Aucune vulnérabilité connue à exploiter. Effectuez d'abord un scan.</span>";
+    }
+    const exploitSuccess = Math.random() < 0.7;
+    if (exploitSuccess) {
+      systemState.accessLevel += 10;
+      return `<span class="success">Exploitation réussie! ${translations[systemState.currentLanguage].accessLevelIncreased} ${systemState.accessLevel}</span>`;
+    } else {
+      return "<span class='error'>L'exploitation a échoué. Essayez à nouveau.</span>";
+    }
+  },
+  'install_backdoor': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    if (systemState.accessLevel < 30) {
+      return "<span class='error'>Niveau d'accès insuffisant pour installer une porte dérobée.</span>";
+    }
+    systemState.backdoorInstalled = true;
+    return "<span class='success'>Porte dérobée installée avec succès.</span>";
+  },
+  'encrypt': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    if (systemState.dataEncrypted) {
+      return "<span class='warning'>Les données sont déjà chiffrées.</span>";
+    }
+    systemState.dataEncrypted = true;
+    systemState.encryptedData = btoa("Données sensibles");
+    return "<span class='success'>Données chiffrées avec succès.</span>";
+  },
+  'decrypt': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    if (!systemState.dataEncrypted) {
+      return "<span class='warning'>Il n'y a pas de données chiffrées à déchiffrer.</span>";
+    }
+    systemState.dataEncrypted = false;
+    const decryptedData = atob(systemState.encryptedData);
+    return `<span class='success'>Données déchiffrées : ${decryptedData}</span>`;
+  },
+  'upgrade': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    const upgradeCost = 20;
+    if (systemState.accessLevel >= upgradeCost) {
+      systemState.accessLevel -= upgradeCost;
+      const upgradeAmount = Math.floor(Math.random() * 10) + 1;
+      systemState.accessLevel += upgradeAmount;
+      return `<span class="success">${translations[systemState.currentLanguage].accessLevelIncreased} ${systemState.accessLevel}</span>`;
+    } else {
+      return "<span class='error'>Niveau d'accès insuffisant pour effectuer une amélioration.</span>";
+    }
+  },
+  'firewall': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    if (systemState.accessLevel < 50) {
+      return "<span class='error'>Niveau d'accès insuffisant pour gérer le pare-feu.</span>";
+    }
+    systemState.firewallActive = !systemState.firewallActive;
+    return `<span class="info">Pare-feu ${systemState.firewallActive ? 'activé' : 'désactivé'}.</span>`;
+  },
+  'antivirus': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    if (systemState.accessLevel < 40) {
+      return "<span class='error'>Niveau d'accès insuffisant pour gérer l'antivirus.</span>";
+    }
+    systemState.antivirusActive = !systemState.antivirusActive;
+    return `<span class="info">Antivirus ${systemState.antivirusActive ? 'activé' : 'désactivé'}.</span>`;
+  },
+  'connect': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    const nodes = systemState.networkNodes.map(node => node.id).join(', ');
+    return `<span class="info">Nœuds disponibles : ${nodes}<br>Utilisez 'connect [nom_du_nœud]' pour vous connecter à un nœud spécifique.</span>`;
+  },
+  'disconnect': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return "<span class='info'>Déconnecté du nœud actuel.</span>";
+  },
+  'ls': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    const currentDirContent = systemState.files[systemState.currentDirectory] || [];
+    return `<span class="info">${translations[systemState.currentLanguage].currentDirectory} ${systemState.currentDirectory}<br>${currentDirContent.join(' ')}</span>`;
+  },
+  'cd': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return "<span class='info'>Utilisez 'cd [nom_du_répertoire]' pour changer de répertoire.</span>";
+  },
+  'cat': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return "<span class='info'>Utilisez 'cat [nom_du_fichier]' pour afficher le contenu d'un fichier.</span>";
+  },
+  'rm': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return "<span class='info'>Utilisez 'rm [nom_du_fichier_ou_répertoire]' pour supprimer un fichier ou un répertoire.</span>";
+  },
+  'mkdir': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return "<span class='info'>Utilisez 'mkdir [nom_du_répertoire]' pour créer un nouveau répertoire.</span>";
+  },
+  'touch': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return "<span class='info'>Utilisez 'touch [nom_du_fichier]' pour créer un nouveau fichier.</span>";
+  },
+  'whoami': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return `<span class="info">Utilisateur actuel : ${systemState.currentUser || 'Non connecté'}</span>`;
+  },
+  'su': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return "<span class='info'>Utilisez 'su [nom_d_utilisateur]' pour changer d'utilisateur.</span>";
+  },
+  'ps': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    const processes = ['httpd', 'mysqld', 'sshd', 'cron'];
+    return `<span class="info">Processus en cours : ${processes.join(', ')}</span>`;
+  },
+  'kill': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return "<span class='info'>Utilisez 'kill [PID]' pour terminer un processus.</span>";
+  },
+  'ifconfig': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return "<span class='info'>Interface eth0: 192.168.1.100<br>Interface lo: 127.0.0.1</span>";
+  },
+  'ping': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return "<span class='info'>Utilisez 'ping [adresse_ip]' pour tester la connectivité.</span>";
+  },
+  'nmap': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return "<span class='info'>Utilisez 'nmap [adresse_ip]' pour scanner les ports d'un hôte.</span>";
+  },
+  'ssh': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return "<span class='info'>Utilisez 'ssh [utilisateur]@[adresse_ip]' pour vous connecter via SSH.</span>";
+  },
+  'wget': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    return "<span class='info'>Utilisez 'wget [url]' pour télécharger un fichier.</span>";
+  },
+  'use': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    if (systemState.activeItem === null) {
+      return `<span class="error">${translations[systemState.currentLanguage].noActiveItem}</span>`;
+    }
+    const item = systemState.inventory[systemState.activeItem];
+    let result = `<span class="success">${translations[systemState.currentLanguage].itemUsed} ${item.name}</span><br>`;
+    switch (item.name) {
+      case 'USB Keylogger':
+        result += "<span class='info'>Keylogger installé. Les frappes clavier seront enregistrées.</span>";
+        break;
+      case 'Cryptographic Token':
+        result += "<span class='info'>Token cryptographique utilisé. Authentification renforcée activée.</span>";
+        break;
+      case 'Network Sniffer':
+        result += "<span class='info'>Sniffer réseau activé. Les paquets seront capturés pour analyse.</span>";
+        break;
+    }
+    return result;
+  },
+  'inventory': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    updateInventory();
+    return "<span class='info'>Inventaire mis à jour. Vérifiez le panneau d'inventaire.</span>";
+  },
+  'objectives': () => {
+    if (!systemState.gameStarted) return "<span class='error'>Le jeu n'a pas encore commencé. Utilisez 'start' pour commencer.</span>";
+    updateObjectives();
+    return "<span class='info'>Objectifs mis à jour. Vérifiez le panneau des objectifs.</span>";
+  },
+  'restart': () => {
+    systemState.gameStarted = false;
+    clearInterval(timerInterval);
+    systemState = {
+      vulnerabilities: [],
+      backdoorInstalled: false,
+      dataEncrypted: false,
+      encryptedData: null,
+      accessLevel: 0,
+      firewallActive: true,
+      antivirusActive: true,
+      networkConnections: [],
+      logs: [],
+      processes: [],
+      users: [
+        { username: 'admin', password: 'admin123', level: 5 },
+        { username: 'user', password: 'password', level: 1 }
+      ],
+      currentUser: null,
+      files: {
+        '/': ['home', 'etc', 'var'],
+        '/home': ['user'],
+        '/home/user': ['documents', 'downloads'],
+        '/etc': ['passwd', 'shadow'],
+        '/var': ['log']
+      },
+      currentDirectory: '/',
+      malware: [],
+      honeyPots: [],
+      ipsRules: [],
+      vpnActive: false,
+      inventory: [
+        { name: 'USB Keylogger', description: 'Enregistre toutes les frappes clavier sur un système cible.', effect: 'Augmente les chances de récupérer des mots de passe.' },
+        { name: 'Cryptographic Token', description: 'Dispositif de sécurité pour l\'authentification à deux facteurs.', effect: 'Permet de contourner certaines mesures de sécurité.' },
+        { name: 'Network Sniffer', description: 'Outil pour capturer et analyser le trafic réseau.', effect: 'Révèle des informations sur les connexions réseau actives.' }
+      ],
+      networkNodes: [],
+      missionObjectives: [],
+      currentLanguage: systemState.currentLanguage,
+      activeItem: null,
+      serverAccessed: false,
+      sensitiveDataExfiltrated: false,
+      rootkitInstalled: false,
+      shellObtained: false,
+      difficulty: systemState.difficulty
+    };
+    updateInventory();
+    updateObjectives();
+    updateNetworkMap();
+    return `<span class="warning">${translations[systemState.currentLanguage].gameRestarted}</span>`;
+  }
+};
+
+function changeLanguage() {
+  const lang = document.getElementById('language').value;
+  systemState.currentLanguage = lang;
+  updateTerminal(`<span class="info">${translations[lang].languageChanged}</span>`);
+  updateStatusBar();
+  updateInventory();
+  updateObjectives();
+}
+
+function changeDifficulty() {
+  const difficulty = document.getElementById('difficulty').value;
+  systemState.difficulty = difficulty;
+  updateTerminal(`<span class="info">${translations[systemState.currentLanguage].difficultyChanged} ${translations[systemState.currentLanguage][difficulty]}</span>`);
+  
+  commands['restart']();
+  
+  switch (difficulty) {
+    case 'easy':
+      gameTimer = 1800; // 30 minutes
+      break;
+    case 'medium':
+      gameTimer = 1200; // 20 minutes
+      break;
+    case 'hard':
+      gameTimer = 600; // 10 minutes
+      break;
+    case 'extreme':
+      gameTimer = 300; // 5 minutes
+      break;
+  }
+  
+  updateTerminal(`<span class="info">${translations[systemState.currentLanguage].gameRestarted}</span>`);
+}
+
+// Initialisation
+updateInventory();
+updateObjectives();
+updateNetworkMap();
+</script>
+</body>
+</html>
